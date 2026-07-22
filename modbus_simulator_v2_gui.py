@@ -73,11 +73,18 @@ class SimulatorGUI(tk.Tk):
         log_frame.pack(fill=tk.BOTH, expand=True)
 
         self.log_text = tk.Text(log_frame, wrap=tk.NONE, height=24)
-        self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.log_text.grid(row=0, column=0, sticky="nsew")
 
         yscroll = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.log_text.yview)
-        yscroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.log_text.configure(yscrollcommand=yscroll.set)
+        yscroll.grid(row=0, column=1, sticky="ns")
+
+        xscroll = ttk.Scrollbar(log_frame, orient=tk.HORIZONTAL, command=self.log_text.xview)
+        xscroll.grid(row=1, column=0, sticky="ew")
+
+        log_frame.rowconfigure(0, weight=1)
+        log_frame.columnconfigure(0, weight=1)
+        self.log_text.configure(yscrollcommand=yscroll.set, xscrollcommand=xscroll.set)
+        self._bind_scroll_events()
 
     @staticmethod
     def _add_labeled_entry(parent: ttk.Frame, label: str, var: tk.StringVar, column: int) -> None:
@@ -186,8 +193,23 @@ class SimulatorGUI(tk.Tk):
                 self._append_log(line)
 
     def _append_log(self, text: str) -> None:
+        # Keep auto-follow only when the view is already at the bottom.
+        at_bottom = self.log_text.yview()[1] >= 0.999
         self.log_text.insert(tk.END, text)
-        self.log_text.see(tk.END)
+        if at_bottom:
+            self.log_text.see(tk.END)
+
+    def _bind_scroll_events(self) -> None:
+        self.log_text.bind("<MouseWheel>", self._on_mousewheel_vertical)
+        self.log_text.bind("<Shift-MouseWheel>", self._on_mousewheel_horizontal)
+
+    def _on_mousewheel_vertical(self, event: tk.Event) -> str:
+        self.log_text.yview_scroll(int(-event.delta / 120), "units")
+        return "break"
+
+    def _on_mousewheel_horizontal(self, event: tk.Event) -> str:
+        self.log_text.xview_scroll(int(-event.delta / 120), "units")
+        return "break"
 
     def _clear_log(self) -> None:
         self.log_text.delete("1.0", tk.END)
