@@ -12,6 +12,14 @@ from pathlib import Path
 from tkinter import messagebox, ttk
 
 CLIENT_IPS_TOKEN = "CLIENT_IPS="
+REGISTER_ROWS = [
+    ("active_power", "Analog", "kW", "float32", "FC03/FC04", "1", "0"),
+    ("frequency", "Analog", "Hz", "float32", "FC03/FC04", "1", "2"),
+    ("voltage", "Analog", "V", "float32", "FC03/FC04", "1", "4"),
+    ("current", "Analog", "A", "float32", "FC03/FC04", "1", "6"),
+    ("relay_state", "Digital", "-", "uint16", "FC03/FC04", "1", "8"),
+    ("device_status", "Digital", "-", "uint16", "FC03/FC04", "1", "9"),
+]
 
 
 class SimulatorGUI(tk.Tk):
@@ -83,6 +91,10 @@ class SimulatorGUI(tk.Tk):
         ttk.Label(clients, text="Currently connected:").pack(anchor=tk.W)
         ttk.Label(clients, textvariable=self.connected_ips_var).pack(anchor=tk.W)
 
+        register_panel = ttk.LabelFrame(self, text="Register Map", padding=(10, 6, 10, 8))
+        register_panel.pack(fill=tk.X, padx=10, pady=(0, 8))
+        self._build_register_panel(register_panel)
+
         log_frame = ttk.Frame(self, padding=(10, 0, 10, 10))
         log_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -106,6 +118,37 @@ class SimulatorGUI(tk.Tk):
         frame.grid(row=0, column=column, padx=5, sticky=tk.W)
         ttk.Label(frame, text=label).pack(anchor=tk.W)
         ttk.Entry(frame, width=12, textvariable=var).pack(anchor=tk.W)
+
+    def _build_register_panel(self, parent: ttk.LabelFrame) -> None:
+        columns = ("parameter", "tag_type", "unit", "data_type", "read_fc", "multiplier", "address")
+        tree = ttk.Treeview(parent, columns=columns, show="headings", height=6)
+        headings = {
+            "parameter": "Parameter",
+            "tag_type": "Tag Type",
+            "unit": "Unit",
+            "data_type": "Data Type",
+            "read_fc": "Read FC",
+            "multiplier": "Multiplier",
+            "address": "Address",
+        }
+        widths = {
+            "parameter": 150,
+            "tag_type": 95,
+            "unit": 60,
+            "data_type": 80,
+            "read_fc": 95,
+            "multiplier": 75,
+            "address": 70,
+        }
+
+        for column in columns:
+            tree.heading(column, text=headings[column])
+            tree.column(column, width=widths[column], stretch=False, anchor=tk.W)
+
+        for row in REGISTER_ROWS:
+            tree.insert("", tk.END, values=row)
+
+        tree.pack(fill=tk.X)
 
     def _build_command(self) -> list[str]:
         if not self._script_path.exists():

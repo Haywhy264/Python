@@ -30,6 +30,27 @@ A single-device Modbus TCP electrical-meter simulator for automated SiteSee2 tes
 **Word order:** big-endian (high word at the lower address).  
 Read holding registers with **FC 03** or input registers with **FC 04**.
 
+### External Device Tag List
+
+Use this table when configuring another device, SCADA client, HMI, or PLC to read from the simulator.
+
+| Parameter      | Tag type      | Unit | Data type | Read function code | Multiplier | Address | Words |
+|----------------|---------------|------|-----------|--------------------|------------|---------|-------|
+| active_power   | Analog input  | kW   | float32   | FC03 or FC04       | 1          | 0       | 2     |
+| frequency      | Analog input  | Hz   | float32   | FC03 or FC04       | 1          | 2       | 2     |
+| voltage        | Analog input  | V    | float32   | FC03 or FC04       | 1          | 4       | 2     |
+| current        | Analog input  | A    | float32   | FC03 or FC04       | 1          | 6       | 2     |
+| relay_state    | Digital status| -    | uint16    | FC03 or FC04       | 1          | 8       | 1     |
+| device_status  | Digital status| -    | uint16    | FC03 or FC04       | 1          | 9       | 1     |
+
+Notes:
+
+- `FC03` reads holding registers.
+- `FC04` reads input registers mirrored from the same values.
+- `float32` values use big-endian word order.
+- `relay_state` returns `1` for closed and `0` for open.
+- `device_status` returns `0` for healthy.
+
 ---
 
 ## Installation
