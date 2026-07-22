@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import queue
+import socket
 import subprocess
 import sys
 import threading
@@ -73,7 +74,13 @@ class SimulatorGUI(tk.Tk):
 
         clients = ttk.LabelFrame(self, text="Connected Client IPs", padding=(10, 6, 10, 8))
         clients.pack(fill=tk.X, padx=10, pady=(0, 8))
+
+        self.local_ip_var = tk.StringVar(value=self._detect_local_ip())
+        ttk.Label(clients, text="Local IP for external clients:").pack(anchor=tk.W)
+        ttk.Label(clients, textvariable=self.local_ip_var).pack(anchor=tk.W, pady=(0, 6))
+
         self.connected_ips_var = tk.StringVar(value="none")
+        ttk.Label(clients, text="Currently connected:").pack(anchor=tk.W)
         ttk.Label(clients, textvariable=self.connected_ips_var).pack(anchor=tk.W)
 
         log_frame = ttk.Frame(self, padding=(10, 0, 10, 10))
@@ -210,6 +217,27 @@ class SimulatorGUI(tk.Tk):
         if not payload:
             payload = "none"
         self.connected_ips_var.set(payload)
+
+    @staticmethod
+    def _detect_local_ip() -> str:
+        # Use outbound route selection to detect the main LAN IP without sending data.
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.connect(("8.8.8.8", 80))
+                ip = sock.getsockname()[0]
+                if ip:
+                    return ip
+        except OSError:
+            pass
+
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+            if ip:
+                return ip
+        except OSError:
+            pass
+
+        return "127.0.0.1"
 
     def _append_log(self, text: str) -> None:
         at_bottom = self.log_text.yview()[1] >= 0.999
