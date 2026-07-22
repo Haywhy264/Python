@@ -68,6 +68,9 @@ python modbus_meter_simulator.py --help
 
 # V2 full help
 & ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v2.py" --help
+
+# V3 full help
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v3.py" --help
 ```
 
 > **Note:** TCP port 502 requires root / Administrator privileges.  
@@ -171,6 +174,72 @@ GUI features:
 
 ---
 
+## V3 Execution (External Client Ready)
+
+`modbus_meter_simulator_v3.py` extends V2 with external-client connectivity and
+connected-IP tracking.
+
+### Files
+
+- `modbus_meter_simulator_v3.py`
+- `modbus_simulator_v3_gui.py`
+- `run_modbus_simulator_v3.bat`
+- `run_modbus_simulator_v3_gui.bat`
+
+### Key behavior changes in V3
+
+- Default bind host is `0.0.0.0` so external Modbus TCP clients can connect
+- Active client IP addresses are tracked in real time
+- Simulator emits structured connection-state lines consumed by the GUI
+
+### Run V3 simulator directly
+
+```powershell
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v3.py" --port 5021 --display-interval 1
+```
+
+### Run V3 simulator via batch launcher
+
+```powershell
+.\run_modbus_simulator_v3.bat
+```
+
+### Run V3 GUI
+
+Option 1 (double-click):
+
+- `run_modbus_simulator_v3_gui.bat`
+
+Option 2 (PowerShell):
+
+```powershell
+.\run_modbus_simulator_v3_gui.bat
+```
+
+Option 3 (direct script):
+
+```powershell
+& ".\.venv\Scripts\python.exe" ".\modbus_simulator_v3_gui.py"
+```
+
+### V3 external connection process
+
+1. Start `modbus_simulator_v3_gui.py`.
+2. Keep `Host` as `0.0.0.0` (or set your LAN adapter IP).
+3. Set `Port` to a non-privileged development port (for example `5021`).
+4. Click **Start**.
+5. From another machine or app, connect using this PC's IP and the configured port.
+6. Watch **Connected Client IPs** in the GUI update live.
+7. Confirm traffic in the log panel (read requests and simulated values).
+
+If no external client can connect:
+
+- Check Windows Firewall inbound rule for your selected TCP port
+- Verify the client targets this machine's reachable LAN IP (not `127.0.0.1`)
+- Ensure the selected host/port are not already in use
+
+---
+
 ## Connecting SiteSee2
 
 1. Open the SiteSee2 **Device Configuration** screen.
@@ -255,6 +324,10 @@ assertions reliable across simulator restarts.
 - Added `run_modbus_simulator_v2.bat` for direct execution
 - Added `modbus_simulator_v2_gui.py` desktop launcher
 - Added `run_modbus_simulator_v2_gui.bat` for one-click GUI start
+- Added `modbus_meter_simulator_v3.py` with external-client support (`0.0.0.0` default bind)
+- Added real-time connected-client IP tracking in V3
+- Added `modbus_simulator_v3_gui.py` with connected-IP display panel
+- Added `run_modbus_simulator_v3.bat` and `run_modbus_simulator_v3_gui.bat`
 
 ## Keeping This README Current
 
