@@ -1,0 +1,265 @@
+# Modbus TCP Meter Simulator
+
+A single-device Modbus TCP electrical-meter simulator for automated SiteSee2 testing.
+
+## Features
+
+- Deterministic, repeatable sinusoidal waveforms – the same `--seed` always produces
+  the same value sequence across restarts
+- Holding registers updated every 100 ms by default (configurable)
+- Input registers (FC 04) mirror holding registers at the same addresses
+- Configurable IP address, TCP port, and Modbus unit ID
+- Logs every client connection, disconnection, and request (DEBUG level)
+- Tracks `request_count`, `connection_count`, and `error_count`
+- Graceful SIGINT / SIGTERM shutdown
+- Full pytest coverage for value generation and register mapping
+
+---
+
+## Register Map
+
+| Address | Words | Type    | Unit | Description                         |
+|---------|-------|---------|------|-------------------------------------|
+| 0       | 2     | float32 | kW   | Active power – 3-phase sum (10..90) |
+| 2       | 2     | float32 | Hz   | Mains frequency (49.9..50.1)        |
+| 4       | 2     | float32 | V    | Phase-A voltage, L-N RMS (225..235) |
+| 6       | 2     | float32 | A    | Phase-A RMS current (derived)       |
+| 8       | 1     | uint16  | –    | Relay state: 1 = closed, 0 = open   |
+| 9       | 1     | uint16  | –    | Device status: 0 = healthy          |
+
+**Word order:** big-endian (high word at the lower address).  
+Read holding registers with **FC 03** or input registers with **FC 04**.
+
+---
+
+## Installation
+
+```powershell
+# Create and activate a virtual environment (recommended)
+python -m venv .venv
+.venv\Scripts\Activate.ps1          # Windows PowerShell
+# source .venv/bin/activate          # Linux / macOS
+
+pip install -r requirements.txt
+```
+
+---
+
+## Running the Simulator
+
+```powershell
+# Default: 0.0.0.0:502, unit ID 1, seed 0, 100 ms update interval
+python modbus_meter_simulator.py
+
+# V2 (localhost default) using venv python directly
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v2.py" --port 5021 --display-interval 1
+
+# Custom settings
+python modbus_meter_simulator.py `
+    --host 127.0.0.1 `
+    --port 5020 `
+    --unit-id 2 `
+    --seed 42 `
+    --interval 200 `
+    --verbose
+
+# Full help
+python modbus_meter_simulator.py --help
+
+# V2 full help
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v2.py" --help
+```
+
+> **Note:** TCP port 502 requires root / Administrator privileges.  
+> Use `--port 5020` (or any port > 1023) for development without elevation.
+
+### Command-line options
+
+| Flag            | Default   | Description                                    |
+|-----------------|-----------|------------------------------------------------|
+| `--host ADDR`   | `0.0.0.0` | Bind address (`0.0.0.0` = all interfaces)      |
+| `--port N`      | `502`     | TCP port                                       |
+| `--unit-id N`   | `1`       | Modbus unit / slave ID (1–247)                 |
+| `--seed N`      | `0`       | Waveform phase seed (0–359)                    |
+| `--interval MS` | `100`     | Register update interval in milliseconds       |
+| `-v/--verbose`  | off       | Enable DEBUG-level logging                     |
+
+### V2 additional options
+
+| Flag                  | Default | Description                                              |
+|-----------------------|---------|----------------------------------------------------------|
+| `--display-interval`  | `1.0`   | Seconds between printed simulated-value lines            |
+| `--hide-values`       | off     | Disable periodic simulated-value logging                 |
+
+---
+
+## V2 Execution (Recommended)
+
+`modbus_meter_simulator_v2.py` is a copy of the simulator configured for localhost-first workflows.
+
+### Run directly from venv
+
+```powershell
+cd "C:\Users\ayomide.adesiyan\OneDrive - Endeco-Technologies\Documents\PYTHON_WORK\Python"
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v2.py" --port 5021 --display-interval 1
+```
+
+Expected startup lines:
+
+- `Meter simulator listening on 127.0.0.1:5021`
+- `Simulated values: active_power=... | frequency=... | voltage=... | current=... | relay_state=1 | device_status=0`
+
+### Run via batch launcher
+
+```powershell
+.\run_modbus_simulator_v2.bat
+```
+
+The batch file already points to `.venv\Scripts\python.exe` and runs V2 with sensible defaults.
+
+### Common PowerShell path fix
+
+Use `.\.venv` (current folder), not `..venv` (parent folder).
+
+Correct:
+
+```powershell
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v2.py" --port 5021 --display-interval 1
+```
+
+Incorrect:
+
+```powershell
+& "..venv\Scripts\python.exe" ...
+```
+
+---
+
+## GUI Execution (V2)
+
+A desktop GUI launcher is provided for start/stop and live log viewing.
+
+### Files
+
+- `modbus_simulator_v2_gui.py`
+- `run_modbus_simulator_v2_gui.bat`
+
+### Start GUI
+
+Option 1 (double-click):
+
+- `run_modbus_simulator_v2_gui.bat`
+
+Option 2 (PowerShell):
+
+```powershell
+.\run_modbus_simulator_v2_gui.bat
+```
+
+Option 3 (run GUI script directly from venv):
+
+```powershell
+& ".\.venv\Scripts\python.exe" ".\modbus_simulator_v2_gui.py"
+```
+
+GUI features:
+
+- Host/Port/Unit ID/Seed/interval input fields
+- Start and Stop buttons
+- Verbose and show-values toggles
+- Live log panel with simulated parameter readings
+
+---
+
+## Connecting SiteSee2
+
+1. Open the SiteSee2 **Device Configuration** screen.
+2. Select **Modbus TCP** as the communication protocol.
+3. Fill in the connection fields:
+
+   | SiteSee2 field | Value                                         |
+   |----------------|-----------------------------------------------|
+   | IP address     | Host running the simulator (e.g. `127.0.0.1`) |
+   | TCP port       | Same as `--port` (default `502`)              |
+   | Unit ID        | Same as `--unit-id` (default `1`)             |
+   | Word order     | Big-endian (high word first)                  |
+
+4. Map the registers using the table in the **Register Map** section above.
+5. Start the SiteSee2 poll. The simulator console will log the connection and
+   each request at DEBUG level (pass `--verbose` to see them).
+
+---
+
+## Running Tests
+
+```powershell
+# Unit tests only (no server started, fast)
+pytest
+
+# Verbose output
+pytest -v
+
+# Include the integration test (starts a real server on localhost:15502)
+pytest -m integration -v
+
+# All tests
+pytest -m "integration or not integration" -v
+```
+
+The test suite covers:
+
+| Area                    | What is tested                                          |
+|-------------------------|---------------------------------------------------------|
+| `ValueGenerator` ranges | All values stay within documented healthy-device bounds |
+| Determinism             | Same seed + same time → identical values                |
+| Periodicity             | Values repeat exactly every `CYCLE_PERIOD_S` seconds    |
+| Float encoding          | `float_to_registers` / `registers_to_float` round-trip  |
+| Register map            | No address gaps, no overlaps, correct total word count  |
+| `_pack_registers`       | Each field decoded from raw words matches source value  |
+| `MeterDataBlock`        | `update_internal` writes, `getValues` slicing           |
+| `Stats`                 | Default zeros, independent per instance                 |
+| `_request_tracer`       | Increments `request_count` on every call                |
+| Integration (optional)  | Live FC 03 read returns in-range values                 |
+
+---
+
+## Determinism
+
+Values are computed from wall-clock time:
+
+```
+phase        = (t / 60.0) x 2pi  +  (seed % 360) x (pi / 180)
+active_power = 50 + 40 x sin(phase)       kW   (period 60 s)
+frequency    = 50 + 0.1 x sin(phase x 3)  Hz   (period 20 s)
+voltage      = 230 + 5  x sin(phase x 2)  V    (period 30 s)
+current      = active_power x 1000 / (3 x voltage x 0.95)  A
+```
+
+The same `--seed` always produces the same waveform shape, making automated
+assertions reliable across simulator restarts.
+
+---
+
+## Out of Scope (v1)
+
+- Fault / exception injection
+- Multiple simultaneous simulated devices
+- High-load / stress testing
+
+---
+
+## Update Log
+
+- Added `modbus_meter_simulator_v2.py` (localhost-first simulator copy)
+- Added periodic simulated-parameter display output in V2
+- Added `run_modbus_simulator_v2.bat` for direct execution
+- Added `modbus_simulator_v2_gui.py` desktop launcher
+- Added `run_modbus_simulator_v2_gui.bat` for one-click GUI start
+
+## Keeping This README Current
+
+When behavior, flags, defaults, launcher scripts, or file names change:
+
+1. Update the matching command examples in this README.
+2. Update the V2/GUI sections in the same change set.
+3. Add one line in **Update Log** summarizing what changed.
