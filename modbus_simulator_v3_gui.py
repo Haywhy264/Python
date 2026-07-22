@@ -87,6 +87,13 @@ class SimulatorGUI(tk.Tk):
         ttk.Label(clients, text="Local IP for external clients:").pack(anchor=tk.W)
         ttk.Label(clients, textvariable=self.local_ip_var).pack(anchor=tk.W, pady=(0, 6))
 
+        details = ttk.Frame(clients)
+        details.pack(fill=tk.X, pady=(0, 6))
+        ttk.Label(details, text="External port:").grid(row=0, column=0, sticky=tk.W, padx=(0, 6))
+        ttk.Label(details, textvariable=self.port_var).grid(row=0, column=1, sticky=tk.W, padx=(0, 20))
+        ttk.Label(details, text="Unit ID:").grid(row=0, column=2, sticky=tk.W, padx=(0, 6))
+        ttk.Label(details, textvariable=self.unit_var).grid(row=0, column=3, sticky=tk.W)
+
         self.connected_ips_var = tk.StringVar(value="none")
         ttk.Label(clients, text="Currently connected:").pack(anchor=tk.W)
         ttk.Label(clients, textvariable=self.connected_ips_var).pack(anchor=tk.W)
@@ -121,7 +128,10 @@ class SimulatorGUI(tk.Tk):
 
     def _build_register_panel(self, parent: ttk.LabelFrame) -> None:
         columns = ("parameter", "tag_type", "unit", "data_type", "read_fc", "multiplier", "address")
-        tree = ttk.Treeview(parent, columns=columns, show="headings", height=6)
+        table_frame = ttk.Frame(parent)
+        table_frame.pack(fill=tk.X, expand=True)
+
+        tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=6)
         headings = {
             "parameter": "Parameter",
             "tag_type": "Tag Type",
@@ -143,12 +153,17 @@ class SimulatorGUI(tk.Tk):
 
         for column in columns:
             tree.heading(column, text=headings[column])
-            tree.column(column, width=widths[column], stretch=False, anchor=tk.W)
+            tree.column(column, width=widths[column], stretch=True, anchor=tk.W)
 
         for row in REGISTER_ROWS:
             tree.insert("", tk.END, values=row)
 
-        tree.pack(fill=tk.X)
+        xscroll = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=tree.xview)
+        tree.configure(xscrollcommand=xscroll.set)
+
+        table_frame.columnconfigure(0, weight=1)
+        tree.grid(row=0, column=0, sticky="ew")
+        xscroll.grid(row=1, column=0, sticky="ew")
 
     def _build_command(self) -> list[str]:
         if not self._script_path.exists():
