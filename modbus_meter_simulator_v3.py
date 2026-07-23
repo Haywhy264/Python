@@ -100,6 +100,7 @@ REGISTER_MAP: Dict[str, Dict] = {
 TOTAL_REGISTERS: int = 10
 CYCLE_PERIOD_S: float = 60.0
 _BLOCK_START: int = 1
+_REGISTER_START: int = 0
 
 
 @dataclass
@@ -271,22 +272,44 @@ class MeterSimulator:
         self._display_interval: float = max(0.1, display_interval_s)
         self._last_display_ts: float = 0.0
         self._datablock: Optional[MeterDataBlock] = None
+        self._ir_block: Optional[ModbusSequentialDataBlock] = None
         self._update_task: Optional[asyncio.Task] = None
         self._server: Optional[IPTrackingModbusTcpServer] = None
         self._running: bool = False
         self._ip_connection_counts: dict[str, int] = {}
+
+    async def _on_runtime_access(
+        self,
+        func_code: int,
+        _start_address: int,
+        _address: int,
+        _count: int,
+        current_registers: list[int],
+        set_values: list[int] | list[bool] | None,
+    ) -> None:
+        # Refresh read blocks just before response generation so clients always
+        # get values derived from the current time.
+        if set_values is not None:
+            return
+        if func_code not in (3, 4):
+            return
+
+        registers = self._pack_registers(self._generator.compute_values(time.time()))
+        current_registers[:TOTAL_REGISTERS] = registers
 
     async def start(self) -> None:
         self._running = True
 
         initial = self._pack_registers(self._generator.compute_values(time.time()))
         self._datablock = MeterDataBlock(_BLOCK_START, initial, self.stats)
-        ir_block = ModbusSequentialDataBlock(_BLOCK_START, list(initial))
+        self._ir_block = ModbusSequentialDataBlock(_BLOCK_START, list(initial))
 
         device_ctx = ModbusDeviceContext(
             hr=self._datablock,
-            ir=ir_block,
+            ir=self._ir_block,
         )
+        device_ctx.simdevice.action = self._on_runtime_access
+        logger.info("Runtime action enabled: %s", bool(device_ctx.simdevice.action))
         server_ctx = ModbusServerContext(
             devices={self.unit_id: device_ctx},
             single=False,
@@ -410,9 +433,6 @@ class MeterSimulator:
         while self._running:
             try:
                 values = self._generator.compute_values(time.time())
-                registers = self._pack_registers(values)
-                if self._datablock is not None:
-                    self._datablock.update_internal(_BLOCK_START, registers)
                 if self._show_values:
                     now_monotonic = time.monotonic()
                     if now_monotonic - self._last_display_ts >= self._display_interval:

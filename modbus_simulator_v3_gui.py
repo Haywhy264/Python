@@ -83,9 +83,14 @@ class SimulatorGUI(tk.Tk):
         clients = ttk.LabelFrame(self, text="Connected Client IPs", padding=(10, 6, 10, 8))
         clients.pack(fill=tk.X, padx=10, pady=(0, 8))
 
-        self.local_ip_var = tk.StringVar(value=self._detect_local_ip())
-        ttk.Label(clients, text="Local IP for external clients:").pack(anchor=tk.W)
-        ttk.Label(clients, textvariable=self.local_ip_var).pack(anchor=tk.W, pady=(0, 6))
+        local_ips = self._detect_local_ips()
+        self.local_ips_var = tk.StringVar(value=", ".join(local_ips))
+        ttk.Label(clients, text="Local IP(s) for external clients:").pack(anchor=tk.W)
+        ttk.Label(clients, textvariable=self.local_ips_var, wraplength=930).pack(anchor=tk.W, pady=(0, 2))
+        ttk.Label(
+            clients,
+            text="Use the IP on the same subnet as the Modbus client.",
+        ).pack(anchor=tk.W, pady=(0, 6))
 
         details = ttk.Frame(clients)
         details.pack(fill=tk.X, pady=(0, 6))
@@ -205,6 +210,7 @@ class SimulatorGUI(tk.Tk):
 
         self.connected_ips_var.set("none")
         self._append_log("\n--- Starting simulator V3 ---\n")
+        self._append_log("Reachable local IPs: " + self.local_ips_var.get() + "\n")
         self._append_log("Command: " + " ".join(cmd) + "\n")
 
         try:
@@ -277,25 +283,36 @@ class SimulatorGUI(tk.Tk):
         self.connected_ips_var.set(payload)
 
     @staticmethod
-    def _detect_local_ip() -> str:
-        # Use outbound route selection to detect the main LAN IP without sending data.
+    def _detect_local_ips() -> list[str]:
+        ips: list[str] = []
+
+        # Enumerate all adapter addresses so users can choose the right subnet.
+        try:
+            host = socket.gethostname()
+            for family, _, _, _, sockaddr in socket.getaddrinfo(host, None):
+                if family != socket.AF_INET:
+                    continue
+                ip = str(sockaddr[0])
+                if ip.startswith("127.") or ip.startswith("169.254."):
+                    continue
+                if ip not in ips:
+                    ips.append(ip)
+        except OSError:
+            pass
+
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.connect(("8.8.8.8", 80))
-                ip = sock.getsockname()[0]
-                if ip:
-                    return ip
+                outbound_ip = sock.getsockname()[0]
+                if outbound_ip and not outbound_ip.startswith("127.") and outbound_ip not in ips:
+                    ips.insert(0, outbound_ip)
         except OSError:
             pass
 
-        try:
-            ip = socket.gethostbyname(socket.gethostname())
-            if ip:
-                return ip
-        except OSError:
-            pass
+        if not ips:
+            ips.append("127.0.0.1")
 
-        return "127.0.0.1"
+        return ips
 
     def _append_log(self, text: str) -> None:
         at_bottom = self.log_text.yview()[1] >= 0.999

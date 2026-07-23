@@ -259,6 +259,74 @@ If no external client can connect:
 - Verify the client targets this machine's reachable LAN IP (not `127.0.0.1`)
 - Ensure the selected host/port are not already in use
 
+### V3 Windows connectivity verification runbook
+
+Use this process when V3 appears to run but an external Modbus TCP client cannot connect.
+
+1. Confirm this PC's active IPv4 addresses.
+
+```powershell
+ipconfig
+```
+
+Record all active adapter IPv4 addresses (for example `192.168.0.104`, `192.168.1.250`).
+
+2. Start the simulator on all interfaces.
+
+```powershell
+& ".\.venv\Scripts\python.exe" ".\modbus_meter_simulator_v3.py" --host 0.0.0.0 --port 5021 --display-interval 1
+```
+
+Expected log lines include:
+
+- `Meter simulator V3 listening on 0.0.0.0:5021 ...`
+- `Server listening.`
+
+3. Verify that the port is actually listening.
+
+```powershell
+Get-NetTCPConnection -LocalPort 5021 -State Listen | Select-Object LocalAddress,LocalPort,OwningProcess
+```
+
+Expected: `LocalAddress` includes `0.0.0.0` and `LocalPort` is `5021`.
+
+4. Validate local TCP reachability on the chosen LAN IP.
+
+```powershell
+Test-NetConnection -ComputerName 192.168.0.104 -Port 5021 | Select-Object ComputerName,RemotePort,TcpTestSucceeded
+```
+
+Expected: `TcpTestSucceeded` is `True`.
+
+5. If external clients still fail, inspect inbound firewall allowance.
+
+```powershell
+Get-NetFirewallRule -PolicyStore ActiveStore |
+   Where-Object { $_.Direction -eq 'Inbound' -and $_.Enabled -eq 'True' -and $_.Action -eq 'Allow' } |
+   Get-NetFirewallPortFilter |
+   Where-Object { $_.Protocol -eq 'TCP' -and ($_.LocalPort -eq '5021' -or $_.LocalPort -eq 'Any') } |
+   Select-Object InstanceID,Protocol,LocalPort
+```
+
+If no suitable rule is present for your network profile, add an inbound allow rule for TCP port `5021`.
+
+6. Configure the external client with the correct target.
+
+- Protocol: `Modbus TCP`
+- Port: `5021`
+- Unit ID: `1`
+- Host IP: use the IP on the same subnet as the client device
+
+Examples:
+
+- Client on `192.168.0.x` network -> use simulator IP `192.168.0.104`
+- Client on `192.168.1.x` network -> use simulator IP `192.168.1.250`
+
+7. Confirm live connection state in the V3 GUI.
+
+- The **Local IP(s) for external clients** line lists candidate addresses.
+- The **Currently connected** line updates when a client connects.
+
 ---
 
 ## Connecting SiteSee2
